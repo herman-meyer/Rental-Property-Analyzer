@@ -4,7 +4,7 @@ import numpy as np
 
 st.set_page_config(page_title="Rental Property Investment Analyzer", layout="wide")
 
-st.title("🏠 Rental Property Investment Analyzer")
+st.title("Rental Property Investment Analyzer")
 st.caption("Built for evaluating rental deals in Whatcom County, WA — model real cash flow, ghost costs, and remodel ROI before you buy.")
 
 st.markdown("---")
@@ -12,28 +12,28 @@ st.markdown("---")
 # ============================================================
 # SIDEBAR - Property & Loan Inputs
 # ============================================================
-st.sidebar.header("📍 Property Details")
-purchase_price = st.sidebar.number_input("Purchase Price ($)", value=575000, step=5000)
+st.sidebar.header("Property Details")
+purchase_price = st.sidebar.number_input("Purchase Price ($)", value=575000, step=10000)
 down_payment_pct = st.sidebar.slider("Down Payment (%)", 5, 50, 20)
 interest_rate = st.sidebar.slider("Interest Rate (%)", 3.0, 9.0, 6.75, step=0.05)
 loan_term_years = st.sidebar.selectbox("Loan Term (years)", [15, 20, 30], index=2)
 
-st.sidebar.header("💵 Rental Income")
-monthly_rent = st.sidebar.number_input("Monthly Rent ($)", value=2400, step=50)
+st.sidebar.header("Rental Income")
+monthly_rent = st.sidebar.number_input("Monthly Rent ($)", value=2400, step=100)
 annual_rent_growth = st.sidebar.slider("Annual Rent Growth (%)", 0.0, 6.0, 3.0, step=0.5)
 
-st.sidebar.header("👻 Ghost Costs (% of rent unless noted)")
+st.sidebar.header("Ghost Costs (% of rent unless noted)")
 vacancy_pct = st.sidebar.slider("Vacancy Rate (%)", 0, 15, 6)
 maintenance_pct = st.sidebar.slider("Maintenance Reserve (%)", 0, 15, 7)
 capex_pct = st.sidebar.slider("CapEx Reserve (%)", 0, 15, 7)
 mgmt_pct = st.sidebar.slider("Property Management (%)", 0, 15, 9)
 
-st.sidebar.header("🏡 Fixed Annual Costs")
+st.sidebar.header("Fixed Annual Costs")
 property_taxes = st.sidebar.number_input("Property Taxes ($/yr)", value=5200, step=100)
 insurance = st.sidebar.number_input("Insurance ($/yr)", value=1400, step=50)
 hoa = st.sidebar.number_input("HOA Fees ($/yr)", value=0, step=50)
 
-st.sidebar.header("📈 Appreciation")
+st.sidebar.header("Appreciation")
 annual_appreciation = st.sidebar.slider("Annual Appreciation (%)", 0.0, 8.0, 3.5, step=0.5)
 hold_period_years = st.sidebar.slider("Hold Period (years)", 1, 30, 10)
 
@@ -77,10 +77,10 @@ cash_on_cash = (annual_cash_flow / cash_invested) * 100 if cash_invested > 0 els
 # TABS
 # ============================================================
 tab1, tab2, tab3, tab4 = st.tabs([
-    "💰 Cash Flow & Ghost Costs",
-    "🔨 Remodel ROI",
-    "📊 Long-Term Returns",
-    "⚖️ Scenario Comparison (A/B)"
+    "Cash Flow & Ghost Costs",
+    "Remodel ROI",
+    "Long-Term Returns",
+    "Scenario Comparison (A/B)"
 ])
 
 # ------------------------------------------------------------
@@ -100,7 +100,7 @@ with tab1:
         "Category": [
             "Mortgage (P&I)", "Property Taxes", "Insurance", "HOA",
             "Vacancy Reserve", "Maintenance Reserve", "CapEx Reserve", "Property Management",
-            "Cash Flow (what's left)"
+            "Cash Flow"
         ],
         "Monthly Cost ($)": [
             monthly_mortgage, property_taxes/12, insurance/12, hoa/12,
@@ -111,7 +111,7 @@ with tab1:
     st.bar_chart(breakdown.set_index("Category"))
     st.dataframe(breakdown.style.format({"Monthly Cost ($)": "${:,.0f}"}), use_container_width=True)
 
-    st.markdown("### 🎯 Deal Score")
+    st.markdown("### Deal Score")
     # Simple weighted score: cash flow (40%), cap rate (30%), cash-on-cash (30%)
     cf_score = min(max(monthly_cash_flow / 5, 0), 40)  # $200/mo cash flow = 40 pts
     cap_score = min(max(cap_rate * 6, 0), 30)  # 5% cap rate = 30 pts
@@ -330,4 +330,4 @@ with tab4:
             f"Higher down payments reduce your mortgage but tie up more cash — the 'better' choice depends on whether you're optimizing for cash flow now or capital growth long-term.")
 
 st.markdown("---")
-st.caption("⚠️ This tool is for educational/illustrative purposes. Not financial advice. Always verify your numbers with a lender, CPA, or licensed professional before making investment decisions.")
+st.caption("This tool is for educational/illustrative purposes. Not financial advice. Always verify your numbers with a lender, CPA, or licensed professional before making investment decisions.")
