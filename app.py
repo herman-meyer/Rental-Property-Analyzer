@@ -76,11 +76,12 @@ cash_on_cash = (annual_cash_flow / cash_invested) * 100 if cash_invested > 0 els
 # ============================================================
 # TABS
 # ============================================================
-tab1, tab2, tab3, tab4 = st.tabs([
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "Cash Flow & Ghost Costs",
     "Remodel ROI",
     "Long-Term Returns",
-    "Scenario Comparison (A/B)"
+    "Scenario Comparison (A/B)",
+    "Rent vs. S&P 500"
 ])
 
 # ------------------------------------------------------------
@@ -328,6 +329,121 @@ with tab4:
     diff = abs(result_a["Cash-on-Cash Return"] - result_b["Cash-on-Cash Return"])
     st.info(f"**Scenario {winner}** has the better cash-on-cash return, by **{diff:.2f} percentage points**. "
             f"Higher down payments reduce your mortgage but tie up more cash — the 'better' choice depends on whether you're optimizing for cash flow now or capital growth long-term.")
+
+# ------------------------------------------------------------
+# TAB 5: Rent vs. S&P 500 (Opportunity Cost)
+# ------------------------------------------------------------
+with tab5:
+    st.subheader("Opportunity Cost: What if you invested the down payment instead?")
+    st.caption("Real estate ties up cash. This compares what your down payment would grow to in the S&P 500 vs. what the property is worth — and tells you the breakeven rent.")
+
+    sp_return = st.slider("Expected S&P 500 Annual Return (%)", 4.0, 12.0, 8.0, step=0.5,
+                           help="Historical S&P 500 long-run average is roughly 8-10% before inflation. Use a conservative number if you're being cautious.")
+
+    # Future value of down payment if invested in S&P 500 instead
+    sp_future_value = down_payment * ((1 + sp_return/100) ** hold_period_years)
+    sp_total_gain = sp_future_value - down_payment
+
+    # Property side: total profit from Tab 3 logic (equity + cash flow)
+    # Recompute using same loop as Tab 3 so this tab works independently
+    years5 = list(range(1, hold_period_years + 1))
+    balance5 = loan_amount
+    cum_cf5 = 0
+    rent5 = monthly_rent
+    for year in years5:
+        prop_value5 = purchase_price * ((1 + annual_appreciation/100) ** year)
+        if year > 1:
+            rent5 = rent5 * (1 + annual_rent_growth/100)
+        ann_rent5 = rent5 * 12
+        vac5 = ann_rent5 * (vacancy_pct/100)
+        maint5 = ann_rent5 * (maintenance_pct/100)
+        cap5 = ann_rent5 * (capex_pct/100)
+        mgmt5 = ann_rent5 * (mgmt_pct/100)
+        egi5 = ann_rent5 - vac5
+        opex5 = maint5 + cap5 + mgmt5 + fixed_costs_total
+        year_noi5 = egi5 - opex5
+        year_cf5 = year_noi5 - annual_mortgage
+        cum_cf5 += year_cf5
+        for _ in range(12):
+            interest_payment5 = balance5 * monthly_rate
+            principal_payment5 = monthly_mortgage - interest_payment5
+            balance5 -= principal_payment5
+    final_property_value5 = prop_value5
+    final_loan_balance5 = max(balance5, 0)
+    final_equity5 = final_property_value5 - final_loan_balance5
+    property_total_profit = (final_equity5 - down_payment) + cum_cf5
+
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Down Payment (Cash Invested)", f"${down_payment:,.0f}")
+    col2.metric(f"S&P 500 Value After {hold_period_years} yrs", f"${sp_future_value:,.0f}",
+                f"+${sp_total_gain:,.0f}")
+    col3.metric(f"Property Total Profit After {hold_period_years} yrs", f"${property_total_profit:,.0f}",
+                f"{'+' if property_total_profit >= sp_total_gain else ''}${property_total_profit - sp_total_gain:,.0f} vs S&P")
+
+    if property_total_profit > sp_total_gain:
+        st.success(f"At current assumptions, this property beats the S&P 500 by **${property_total_profit - sp_total_gain:,.0f}** "
+                    f"over {hold_period_years} years.")
+    else:
+        st.warning(f"At current assumptions, the S&P 500 beats this property by **${sp_total_gain - property_total_profit:,.0f}** "
+                   f"over {hold_period_years} years. The property would need higher rent, appreciation, or cash flow to catch up.")
+
+    st.markdown("---")
+    st.markdown("### Breakeven Rent: What rent makes this property match the S&P 500?")
+    st.caption("Solves for the monthly rent (at year 1, growing at your assumed rate) needed so the property's total profit equals the S&P 500's return.")
+
+    # Solve for breakeven rent via simple binary search on monthly_rent
+    target_profit = sp_total_gain
+
+    def total_profit_for_rent(test_rent):
+        bal = loan_amount
+        cum = 0
+        r = test_rent
+        pv = purchase_price
+        for year in years5:
+            pv = purchase_price * ((1 + annual_appreciation/100) ** year)
+            if year > 1:
+                r = r * (1 + annual_rent_growth/100)
+            ar = r * 12
+            v = ar * (vacancy_pct/100)
+            m = ar * (maintenance_pct/100)
+            c = ar * (capex_pct/100)
+            mg = ar * (mgmt_pct/100)
+            egi_ = ar - v
+            opex_ = m + c + mg + fixed_costs_total
+            noi_ = egi_ - opex_
+            cf_ = noi_ - annual_mortgage
+            cum += cf_
+            for _ in range(12):
+                ip = bal * monthly_rate
+                pp = monthly_mortgage - ip
+                bal -= pp
+        final_eq = pv - max(bal, 0)
+        return (final_eq - down_payment) + cum
+
+    low, high = 0, monthly_rent * 5
+    for _ in range(60):
+        mid = (low + high) / 2
+        if total_profit_for_rent(mid) < target_profit:
+            low = mid
+        else:
+            high = mid
+    breakeven_rent = (low + high) / 2
+
+    bcol1, bcol2 = st.columns(2)
+    bcol1.metric("Your Current Rent Assumption", f"${monthly_rent:,.0f}/mo")
+    bcol2.metric("Breakeven Rent (Year 1)", f"${breakeven_rent:,.0f}/mo",
+                 f"{'+' if breakeven_rent >= monthly_rent else ''}${breakeven_rent - monthly_rent:,.0f}")
+
+    if breakeven_rent <= monthly_rent:
+        st.info(f"Your current rent assumption already clears the S&P 500 benchmark — the property is the better use of this cash "
+                f"by this measure, assuming your appreciation and rent growth assumptions hold.")
+    else:
+        st.info(f"You'd need to charge **${breakeven_rent:,.0f}/mo** (vs. your current ${monthly_rent:,.0f}/mo) for this property "
+                f"to match putting the down payment in the S&P 500 over {hold_period_years} years.")
+
+    st.caption("⚠️ This is a simplified comparison. It doesn't account for taxes (capital gains, depreciation recapture, 1031 exchanges), "
+               "leverage risk, liquidity differences, or the fact that real estate returns are leveraged while this S&P comparison is not. "
+               "Use this as a directional sanity check, not a final decision.")
 
 st.markdown("---")
 st.caption("This tool is for educational/illustrative purposes. Not financial advice. Always verify your numbers with a lender, CPA, or licensed professional before making investment decisions.")
